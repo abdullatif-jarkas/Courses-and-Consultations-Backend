@@ -24,6 +24,12 @@ const userSchema = new Schema<IUser>(
       enum: ["user", "admin", "employee"],
       default: "user",
     },
+    resetCode: {
+      type: String,
+    },
+    resetCodeExpires: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );

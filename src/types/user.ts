@@ -4,4 +4,6 @@ export interface IUser extends Document {
   email: string;
   password: string;
   role: "user" | "admin" | "employee";
+  resetCode?: string;
+  resetCodeExpires?: Date;
 }
