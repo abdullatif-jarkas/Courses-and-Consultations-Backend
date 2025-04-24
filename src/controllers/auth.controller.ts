@@ -3,7 +3,12 @@ import { Request, RequestHandler, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { IUser } from "@/types/user";
-import { loginSchema, registerSchema } from "@/validators/userSchema";
+import {
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  forgotPasswordSchema,
+} from "@/validators/userSchema";
 import { JWT_SECRET } from "@/config/config";
 import asyncHandler from "express-async-handler";
 import { sendEmail } from "@/utils/sendEmail";
@@ -28,7 +33,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
-  const { fullName, email, password, role } = parsed.data;
+  const { fullName, email, password } = parsed.data;
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -128,7 +133,17 @@ export const login: RequestHandler = asyncHandler(
 
 export const forgotPassword = asyncHandler(
   async (req: Request, res: Response) => {
-    const { email } = req.body;
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        status: "error",
+        message: "Invalid input data",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const { email } = parsed.data;
 
     const user = await User.findOne({ email });
     if (!user) {
@@ -167,7 +182,17 @@ export const forgotPassword = asyncHandler(
 
 export const resetPassword = asyncHandler(
   async (req: Request, res: Response) => {
-    const { email, code, newPassword } = req.body;
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        status: "error",
+        message: "Invalid input data",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const { email, resetCode, password } = parsed.data;
 
     const user = await User.findOne({ email });
     if (!user || !user.resetCode || !user.resetCodeExpires) {
@@ -179,7 +204,7 @@ export const resetPassword = asyncHandler(
     }
 
     const isCodeValid =
-      user.resetCode === code && user.resetCodeExpires > new Date();
+      user.resetCode === resetCode && user.resetCodeExpires > new Date();
     if (!isCodeValid) {
       res.status(400).json({
         status: "error",
@@ -188,7 +213,7 @@ export const resetPassword = asyncHandler(
       return;
     }
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    user.password = await bcrypt.hash(password, 10);
     user.resetCode = undefined;
     user.resetCodeExpires = undefined;
     await user.save();
