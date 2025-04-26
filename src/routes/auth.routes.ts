@@ -1,4 +1,3 @@
-import express from "express";
 import { Router } from "express";
 const authRouter = Router();
 import {
@@ -6,11 +5,14 @@ import {
   login,
   forgotPassword,
   resetPassword,
+  refreshToken,
+  logout,
 } from "@/controllers/auth.controller";
 
 authRouter.post("/register", register);
 authRouter.post("/login", login);
+authRouter.post("/logout", logout);
 authRouter.post("/forgot-password", forgotPassword);
 authRouter.post("/reset-password", resetPassword);
-
+authRouter.post("/refresh-token", refreshToken);
 export default authRouter;

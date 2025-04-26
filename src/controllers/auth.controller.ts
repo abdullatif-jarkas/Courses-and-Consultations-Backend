@@ -12,7 +12,12 @@ import {
 import { JWT_SECRET } from "@/config/config";
 import asyncHandler from "express-async-handler";
 import { sendEmail } from "@/utils/sendEmail";
-import { generateExpiryMinutes, generateOTP } from "@/utils/authHelpers";
+import {
+  generateAccessToken,
+  generateExpiryMinutes,
+  generateOTP,
+  generateRefreshToken,
+} from "@/utils/authHelpers";
 
 /** @description Register
  * @param {string} fullName
@@ -20,6 +25,7 @@ import { generateExpiryMinutes, generateOTP } from "@/utils/authHelpers";
  * @param {string} password
  * @param {string} role
  * @returns {Promise<void>}
+ * @route POST /api/auth/register
  */
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
@@ -33,7 +39,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
-  const { fullName, email, password } = parsed.data;
+  const { fullName, email, password, phoneNumber } = parsed.data;
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -50,7 +56,23 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     fullName,
     email,
     password: hashedPassword,
+    phoneNumber,
     role: "user",
+  });
+
+  const accessToken = generateAccessToken(user._id, user.role);
+  const refreshToken = generateRefreshToken(user._id);
+
+  res.cookie("accessToken", accessToken, {
+    httpOnly: true,
+    sameSite: "strict",
+    maxAge: 15 * 60 * 1000, //? 15 Minutes
+  });
+
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000, //? 7 Days
   });
 
   res.status(201).json({
@@ -60,6 +82,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
         _id: user._id,
         fullName: user.fullName,
         email: user.email,
+        phoneNumber: user.phoneNumber,
         role: user.role,
       },
     },
@@ -70,7 +93,9 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
  * @param {string} email
  * @param {string} password
  * @returns {Promise<void>}
+ * @route POST /api/auth/login
  */
+
 
 export const login: RequestHandler = asyncHandler(
   async (req: Request, res: Response) => {
@@ -107,18 +132,29 @@ export const login: RequestHandler = asyncHandler(
       return;
     }
 
-    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, {
-      expiresIn: "1h",
+    const accessToken = generateAccessToken(user._id, user.role);
+    const refreshToken = generateRefreshToken(user._id);
+
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000, //? 15 Minutes
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, //? 7 Days
     });
 
     res.status(200).json({
       status: "success",
       data: {
-        token,
         user: {
           _id: user._id,
           fullName: user.fullName,
           email: user.email,
+          phoneNumber: user.phoneNumber,
           role: user.role,
         },
       },
@@ -126,10 +162,26 @@ export const login: RequestHandler = asyncHandler(
   }
 );
 
+/** @description Logout
+ * @returns {Promise<void>}
+ * @route POST /api/auth/logout
+ */
+
+export const logout = asyncHandler(async (req: Request, res: Response) => {
+  res.clearCookie("token", { path: "/" });
+  res.clearCookie("accessToken", { path: "/" });
+  res.clearCookie("refreshToken", { path: "/" });
+  res
+    .status(200)
+    .json({ status: "success", message: "Logged out successfully" });
+});
+
 /** @description Forgot password
  * @param {string} email
  * @returns {Promise<void>}
+ * @route POST /api/auth/forgot-password
  */
+
 
 export const forgotPassword = asyncHandler(
   async (req: Request, res: Response) => {
@@ -163,8 +215,72 @@ export const forgotPassword = asyncHandler(
 
     await sendEmail(
       email,
-      "Your Reset Code",
-      `Your password reset code is: ${otpCode}`
+      "Your Password Reset Code",
+`
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: 'Arial', sans-serif;
+              background-color: #f4f4f9;
+              margin: 0;
+              padding: 0;
+            }
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              background-color: #ffffff;
+              padding: 20px;
+              border-radius: 8px;
+              box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            }
+            .header {
+              background-color: #4CAF50;
+              color: white;
+              padding: 10px;
+              text-align: center;
+              border-radius: 8px 8px 0 0;
+            }
+            .content {
+              padding: 20px;
+            }
+            .footer {
+              text-align: center;
+              font-size: 12px;
+              color: #777;
+              margin-top: 20px;
+            }
+            .otp-code {
+              font-size: 24px;
+              font-weight: bold;
+              color: #4CAF50;
+              padding: 10px;
+              background-color: #f4f4f9;
+              border-radius: 4px;
+              display: inline-block;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h2>Password Reset Request</h2>
+            </div>
+            <div class="content">
+              <p>Hi there,</p>
+              <p>We received a request to reset your password. Please use the following code to reset your password:</p>
+              <p class="otp-code">${otpCode}</p>
+              <p>This code will expire in 10 minutes.</p>
+              <p>If you didn't request a password reset, you can safely ignore this email.</p>
+              <p>Best regards,<br>Your Team</p>
+            </div>
+            <div class="footer">
+              <p>For any issues, please contact support.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+      `
     );
 
     res.status(200).json({
@@ -178,7 +294,9 @@ export const forgotPassword = asyncHandler(
  * @param {string} token
  * @param {string} newPassword
  * @returns {Promise<void>}
+ * @route POST /api/auth/reset-password
  */
+
 
 export const resetPassword = asyncHandler(
   async (req: Request, res: Response) => {
@@ -222,5 +340,48 @@ export const resetPassword = asyncHandler(
       status: "success",
       message: "Password successfully updated.",
     });
+  }
+);
+
+/** @description Refresh token
+ * @returns {Promise<void>}
+ * @route POST /api/auth/refresh-token
+ */
+
+export const refreshToken = asyncHandler(
+  async (req: Request, res: Response) => {
+    const token = req.cookies.refreshToken;
+
+    if (!token) {
+      res.status(401).json({ status: "error", message: "No refresh token" });
+      return;
+    }
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+      const user = await User.findById(decoded.userId);
+
+      if (!user) {
+        res.status(401).json({ status: "error", message: "User not found" });
+        return;
+      }
+
+      const newAccessToken = generateAccessToken(user._id, user.role);
+
+      res.cookie("accessToken", newAccessToken, {
+        httpOnly: true,
+        sameSite: "strict",
+        maxAge: 15 * 60 * 1000,
+      });
+
+      res.status(200).json({
+        status: "success",
+        message: "Access token refreshed",
+      });
+    } catch (err) {
+      res
+        .status(403)
+        .json({ status: "error", message: "Invalid refresh token" });
+    }
   }
 );

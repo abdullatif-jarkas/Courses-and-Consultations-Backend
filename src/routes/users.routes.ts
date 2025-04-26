@@ -1,6 +1,7 @@
 import { verifyToken } from "@/middlewares/auth.middleware";
 import { authorizeRoles } from "@/middlewares/role.middleware";
 import { Router } from "express";
+import { updateUser, updateUserPassword } from "@/controllers/users.controller";
 const userRouter = Router();
 
 // Only for admin
@@ -17,5 +18,10 @@ userRouter.get("/employee", verifyToken, authorizeRoles("admin", "employee"), (r
 userRouter.get("/", (req, res) => {
   res.send("User page");
 });
+
+
+userRouter.put('/me', verifyToken, updateUser);
+userRouter.put('/me/password', verifyToken, updateUserPassword);
+
 
 export default userRouter;
