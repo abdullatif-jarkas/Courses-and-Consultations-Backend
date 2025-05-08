@@ -1,4 +1,4 @@
-import User from "@/models/User";
+import User from "@/models/user.model";
 import { Request, RequestHandler, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -96,7 +96,6 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
  * @route POST /api/auth/login
  */
 
-
 export const login: RequestHandler = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = loginSchema.safeParse(req.body);
@@ -182,7 +181,6 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
  * @route POST /api/auth/forgot-password
  */
 
-
 export const forgotPassword = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = forgotPasswordSchema.safeParse(req.body);
@@ -216,7 +214,7 @@ export const forgotPassword = asyncHandler(
     await sendEmail(
       email,
       "Your Password Reset Code",
-`
+      `
       <html>
         <head>
           <style>
@@ -296,7 +294,6 @@ export const forgotPassword = asyncHandler(
  * @returns {Promise<void>}
  * @route POST /api/auth/reset-password
  */
-
 
 export const resetPassword = asyncHandler(
   async (req: Request, res: Response) => {
